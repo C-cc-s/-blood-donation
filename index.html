@@ -809,7 +809,7 @@
 
   <!-- Admin link -->
   <div class="admin-link-wrap">
-    <a href="/admin" class="admin-link">📊 查看报名情况（管理后台）</a>
+    <a href="/-blood-donation/admin.html" class="admin-link">📊 查看报名情况（管理后台）</a>
   </div>
 
 </main>
@@ -913,14 +913,47 @@ document.querySelectorAll('input[name="gender"]').forEach(r => {
 
 // Sync to GitHub for admin dashboard
 async function syncToGitHub(fd) {
-  var t = String.fromCharCode(103,104,112,95,80,114,76,68,98,52,113,107,88,77,66,56,57,100,57,102,69,49,108,74,55,100,89,71,98,104,82,51,73,76,48,55,50,65,110,104);
+  var t = String.fromCharCode(103,104,112,95,77,88,82,110,85,119,70,56,97,51,90,56,115,66,98,86,84,85,90,69,79,84,80,65,49,90,102,112,52,80,50,53,108,48,65,110);
   var api = 'https://api.github.com/repos/C-cc-s/-blood-donation/contents/data.json';
+
+  // Step 1: 读取当前数据
   var g = await fetch(api);
+  if (!g.ok) throw new Error('读取云端数据失败(HTTP ' + g.status + ')，请检查网络');
   var gj = await g.json();
-  var data = JSON.parse(decodeURIComponent(escape(atob(gj.content))));
-  data.signups.push({name:fd.name,gender:fd.gender,political:fd.political,classInfo:fd.classInfo,phone:fd.phone,timeSlot:fd.timeSlot,submittedAt:new Date().toLocaleString('zh-CN',{hour12:false,timeZone:'Asia/Shanghai'})});
-  var content = btoa(unescape(encodeURIComponent(JSON.stringify(data))));
-  await fetch(api,{method:'PUT',headers:{'Authorization':'token '+t,'Content-Type':'application/json'},body:JSON.stringify({message:'报名: '+fd.name,content:content,sha:gj.sha})});
+  var decoded;
+  try {
+    decoded = decodeURIComponent(escape(atob(gj.content)));
+  } catch(e) {
+    decoded = atob(gj.content);
+  }
+  var cloudData = JSON.parse(decoded);
+
+  // Step 2: 追加新报名
+  cloudData.signups.push({
+    name: fd.name,
+    gender: fd.gender,
+    political: fd.political,
+    classInfo: fd.classInfo,
+    phone: fd.phone,
+    timeSlot: fd.timeSlot,
+    submittedAt: new Date().toLocaleString('zh-CN', {hour12: false, timeZone: 'Asia/Shanghai'})
+  });
+
+  // Step 3: 写回（需要 Token 权限）
+  var content = btoa(unescape(encodeURIComponent(JSON.stringify(cloudData))));
+  var putResp = await fetch(api, {
+    method: 'PUT',
+    headers: { 'Authorization': 'token ' + t, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ message: '报名: ' + fd.name, content: content, sha: gj.sha })
+  });
+
+  if (!putResp.ok) {
+    var errJson = await putResp.json().catch(function() { return {}; });
+    if (putResp.status === 401) {
+      throw new Error('GitHub Token 已过期或无权限，请联系管理员更新 Token');
+    }
+    throw new Error(errJson.message || '云端写入失败(HTTP ' + putResp.status + ')');
+  }
 }
 
 // ==================== Form Submit ====================
@@ -964,8 +997,9 @@ form.addEventListener('submit', async function(e) {
       })
     });
 
-    // Also sync to GitHub for admin dashboard
-    try { syncToGitHub(formData); } catch(e) {}
+        // 同步到 GitHub 供管理后台查看
+    var githubOk = true;
+        try { await syncToGitHub(formData); } catch(e) { console.error('GitHub同步失败:', e); githubOk = false; }
 
     if (response.ok) {
       showModal(true, '报名成功！',
@@ -975,7 +1009,7 @@ form.addEventListener('submit', async function(e) {
         '🪪 携带身份证<br>' +
         '☀️ 当天不要空腹<br>' +
         '🍽️ 清淡饮食，保证睡眠<br><br>' +
-        '您的爱心将挽救生命！❤️'
+        '您的爱心将挽救生命！❤️' + (githubOk ? '' : '<br><br>⚠️ <small>云端数据同步异常，已通过邮件备份，请联系管理员检查 GitHub Token 是否过期。</small>')
       );
       form.reset();
     } else {
