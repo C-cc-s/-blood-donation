@@ -606,7 +606,7 @@
     <p class="subtitle">热血担当&nbsp;&nbsp;为爱捋袖</p>
     <div class="deadline-banner">
       <span class="icon">⏰</span>
-      <span>报名截止：<strong>6月10日 22:00</strong></span>
+      <span>报名截止：<strong>6月11日 22:00</strong></span>
     </div>
     <div style="margin-top:20px;">
       <a href="#formAnchor" class="hero-cta">📝 立即报名 ↓</a>
@@ -696,9 +696,22 @@
         </div>
 
         <div class="form-group">
-          <label class="form-label" for="classInfo">专业班级 <span class="required">*</span></label>
-          <input type="text" id="classInfo" class="form-input" placeholder="例如：水利水电工程2024级01班" required>
-          <span class="error-msg" id="classInfoError">请输入专业班级</span>
+          <label class="form-label" for="classInfo">班级 <span class="required">*</span></label>
+          <select id="classInfo" class="form-select" required>
+            <option value="">请选择班级</option>
+            <option value="2201">2201</option>
+            <option value="2202">2202</option>
+            <option value="2203">2203</option>
+            <option value="2301">2301</option>
+            <option value="2302">2302</option>
+            <option value="2303">2303</option>
+            <option value="2401">2401</option>
+            <option value="2402">2402</option>
+            <option value="2403">2403</option>
+            <option value="2501">2501</option>
+            <option value="2502">2502</option>
+          </select>
+          <span class="error-msg" id="classInfoError">请选择班级</span>
         </div>
 
         <div class="form-group">
@@ -794,7 +807,7 @@
       📝 提交报名
     </button>
     <p class="deadline-reminder">
-      ⏰ 报名截止时间：<strong>2026年6月10日 22:00</strong> · 献血日期：6月12日
+      ⏰ 报名截止时间：<strong>2026年6月11日 22:00</strong> · 献血日期：6月12日
     </p>
   </div>
 
@@ -802,7 +815,7 @@
   <div class="sticky-bar" id="stickyBar">
     <div class="sb-info">
       <div class="sb-title">🩸 6月12日无偿献血</div>
-      <div class="sb-deadline">⏰ 截止：6月10日 22:00</div>
+      <div class="sb-deadline">⏰ 截止：6月11日 22:00</div>
     </div>
     <button class="btn-sticky-submit" onclick="document.getElementById('submitBtn').click()">📝 提交报名</button>
   </div>
@@ -904,7 +917,7 @@ function validate() {
 
 // Real-time validation clear
 document.getElementById('name').addEventListener('input', function() { if (this.value.trim()) clearError('name', 'nameError'); });
-document.getElementById('classInfo').addEventListener('input', function() { if (this.value.trim()) clearError('classInfo', 'classInfoError'); });
+document.getElementById('classInfo').addEventListener('change', function() { if (this.value) clearError('classInfo', 'classInfoError'); });
 document.getElementById('phone').addEventListener('input', function() { if (validatePhone(this.value.trim())) clearError('phone', 'phoneError'); });
 document.getElementById('political').addEventListener('change', function() { if (this.value) clearError('political', 'politicalError'); });
 document.querySelectorAll('input[name="gender"]').forEach(r => {
