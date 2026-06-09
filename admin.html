@@ -91,6 +91,7 @@
   <div class="toolbar">
     <a href="/-blood-donation/" class="btn btn-b">← 返回报名页</a>
     <button class="btn btn-r" onclick="loadData()">🔄 刷新</button>
+    <button class="btn btn-r" id="autoBtn" onclick="toggleAuto()" style="font-size:0.75rem;">⏸ 自动</button>
     <button class="btn btn-e" onclick="exportCSV()">📥 导出CSV</button>
     <button class="btn btn-d" onclick="clearAll()">🗑 清空</button>
     <span class="st" id="syncStatus"></span>
@@ -137,7 +138,7 @@ async function loadData() {
   var area = document.getElementById('tableArea');
   area.innerHTML = '<div class="loading">加载中...</div>';
   try {
-    var res = await fetch(API);
+    var res = await fetch(API, { headers: { 'Authorization': 'token ' + getToken() } });
     if (!res.ok) throw new Error('HTTP '+res.status);
     var gj = await res.json();
     var decoded;
@@ -167,7 +168,7 @@ function getToken() {
 // ==================== 保存到 GitHub ====================
 async function saveToGitHub(message) {
   var t = getToken();
-  var r = await fetch(API);
+  var r = await fetch(API, { headers: { 'Authorization': 'token ' + t } });
   if (!r.ok) throw new Error('读取云端数据失败 HTTP ' + r.status);
   var gj = await r.json();
   var content = btoa(unescape(encodeURIComponent(JSON.stringify({signups: data}))));
@@ -204,7 +205,7 @@ async function clearAll() {
   if (!confirm('再次确认：此操作不可恢复！')) return;
   var t = getToken();
   try {
-    var r = await fetch(API);
+    var r = await fetch(API, { headers: { 'Authorization': 'token ' + t } });
     var gj = await r.json();
     var content = btoa(unescape(encodeURIComponent('{"signups":[]}')));
     await fetch(API,{method:'PUT',headers:{'Authorization':'token '+t,'Content-Type':'application/json'},body:JSON.stringify({message:'清空数据',content:content,sha:gj.sha})});
@@ -248,6 +249,33 @@ function exportCSV() {
 }
 
 function esc(s){ var d=document.createElement('div'); d.textContent=s||''; return d.innerHTML; }
+
+// ==================== 自动刷新 (30秒) ====================
+var autoTimer = null;
+var autoCountdown = 0;
+
+function toggleAuto() {
+  if (autoTimer) {
+    clearInterval(autoTimer);
+    autoTimer = null;
+    document.getElementById('autoBtn').textContent = '▶ 自动';
+    document.getElementById('autoBtn').style.color = '';
+    document.getElementById('syncStatus').textContent = '自动刷新已关闭';
+    return;
+  }
+  autoCountdown = 30;
+  document.getElementById('autoBtn').textContent = '⏸ 自动 30s';
+  document.getElementById('autoBtn').style.color = '#27ae60';
+  document.getElementById('syncStatus').textContent = '自动刷新中...';
+  autoTimer = setInterval(function() {
+    autoCountdown--;
+    if (autoCountdown <= 0) {
+      loadData();
+      autoCountdown = 30;
+    }
+    document.getElementById('autoBtn').textContent = '⏸ 自动 ' + autoCountdown + 's';
+  }, 1000);
+}
 </script>
 </body>
 </html>
