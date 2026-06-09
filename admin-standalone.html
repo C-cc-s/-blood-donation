@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>献血报名数据管理</title>
+<style>
+  :root { --blood:#c41e3a; --bg:#f5f3f0; --card:#fff; --ink:#1a1a1a; --muted:#888; --border:#e0dcd6; --radius:14px; }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif; background:var(--bg); color:var(--ink); line-height:1.6; min-height:100vh; }
+  .header { background:linear-gradient(160deg,#1a1a2e,#16213e,#0f3460); color:#fff; padding:28px 20px 36px; text-align:center; }
+  .header h1 { font-size:1.5rem; font-weight:800; } .header p { font-size:0.85rem; opacity:0.7; margin-top:4px; }
+  .container { max-width:800px; margin:0 auto; padding:0 16px 40px; margin-top:-14px; }
+
+  .stats { display:grid; grid-template-columns:repeat(4,1fr); gap:10px; margin:16px 0; }
+  .stat { background:#fff; border-radius:var(--radius); padding:14px 10px; text-align:center; box-shadow:0 2px 8px rgba(0,0,0,0.05); }
+  .stat .n { font-size:1.6rem; font-weight:800; color:var(--blood); } .stat .l { font-size:0.7rem; color:var(--muted); }
+
+  .card { background:#fff; border-radius:var(--radius); padding:20px; box-shadow:0 2px 12px rgba(0,0,0,0.06); margin-bottom:16px; }
+
+  .toolbar { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:14px; }
+  .btn { padding:9px 16px; border:none; border-radius:50px; font-size:0.82rem; font-weight:600; cursor:pointer; font-family:inherit; }
+  .btn-e { background:#27ae60; color:#fff; } .btn-c { background:#e74c3c; color:#fff; }
+
+  textarea { width:100%; height:200px; border:1.5px solid var(--border); border-radius:10px; padding:12px; font-family:monospace; font-size:0.8rem; resize:vertical; }
+  .hint { font-size:0.78rem; color:var(--muted); margin-bottom:8px; }
+
+  table { width:100%; border-collapse:collapse; font-size:0.78rem; }
+  th { background:#f9f6f3; font-weight:700; padding:10px 6px; text-align:left; border-bottom:2px solid var(--border); }
+  td { padding:8px 6px; border-bottom:1px solid #f0ece8; }
+  .table-wrap { overflow-x:auto; }
+  .footer { text-align:center; padding:12px; font-size:0.78rem; color:var(--muted); }
+  .empty { text-align:center; padding:40px; color:var(--muted); }
+
+  @media(max-width:500px){ .stats{grid-template-columns:repeat(2,1fr)} }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>献血报名数据管理</h1>
+  <p>从QQ邮箱复制报名数据 → 粘贴到下方 → 自动解析成表格</p>
+</div>
+
+<div class="container">
+  <div class="stats">
+    <div class="stat"><div class="n" id="tN">0</div><div class="l">总报名</div></div>
+    <div class="stat"><div class="n" id="mN">0</div><div class="l">男生</div></div>
+    <div class="stat"><div class="n" id="fN">0</div><div class="l">女生</div></div>
+    <div class="stat"><div class="n" id="dN">0</div><div class="l">今日</div></div>
+  </div>
+
+  <div class="card">
+    <p class="hint">📧 把QQ邮箱中的报名邮件内容，复制粘贴到下方文本框，点击「解析导入」</p>
+    <textarea id="rawInput" placeholder="粘贴邮件内容..."></textarea>
+    <div class="toolbar" style="margin-top:12px;">
+      <button class="btn btn-e" onclick="importData()">📥 解析导入</button>
+      <button class="btn" style="background:#fff;border:1.5px solid var(--border);" onclick="exportCSV()">📤 导出CSV</button>
+      <button class="btn btn-c" onclick="if(confirm('确定清空?')){localStorage.removeItem('bd_data');render();}">🗑 清空</button>
+    </div>
+  </div>
+
+  <div class="card" id="tableCard">
+    <div class="table-wrap" id="tableArea"><div class="empty">暂无数据，请导入邮件内容</div></div>
+  </div>
+</div>
+
+<script>
+var data = JSON.parse(localStorage.getItem('bd_data') || '[]');
+
+function render() {
+  localStorage.setItem('bd_data', JSON.stringify(data));
+  var today = new Date().toLocaleDateString('zh-CN',{timeZone:'Asia/Shanghai'});
+  document.getElementById('tN').textContent = data.length;
+  document.getElementById('mN').textContent = data.filter(function(d){return d.gender==='男'}).length;
+  document.getElementById('fN').textContent = data.filter(function(d){return d.gender==='女'}).length;
+  document.getElementById('dN').textContent = data.filter(function(d){return d.submittedAt&&d.submittedAt.includes(today)}).length;
+  var area = document.getElementById('tableArea');
+  if (!data.length) { area.innerHTML='<div class="empty">暂无数据，请导入邮件内容</div>'; return; }
+  var h='<table><thead><tr><th>#</th><th>姓名</th><th>性别</th><th>政治面貌</th><th>专业班级</th><th>电话</th><th>献血时间</th><th>提交时间</th></tr></thead><tbody>';
+  data.forEach(function(d,i){
+    h+='<tr><td>'+(i+1)+'</td><td>'+esc(d.name)+'</td><td>'+esc(d.gender)+'</td><td>'+esc(d.political||'')+'</td><td>'+esc(d.classInfo)+'</td><td>'+esc(d.phone)+'</td><td>'+esc(d.timeSlot||'')+'</td><td>'+esc(d.submittedAt||'')+'</td></tr>';
+  });
+  h+='</tbody></table><div class="footer">共 '+data.length+' 条记录</div>';
+  area.innerHTML = h;
+}
+
+function importData() {
+  var raw = document.getElementById('rawInput').value.trim();
+  if (!raw) return alert('请先粘贴邮件内容');
+  var lines = raw.split('\n').filter(function(l){ return l.trim(); });
+  var count = 0;
+  for (var i = 0; i < lines.length; i++) {
+    var parts = lines[i].split(/\t|\s{2,}|,\s*/);
+    if (parts.length >= 7) {
+      var rec = { name:parts[0]||'', gender:parts[1]||'', political:parts[2]||'', classInfo:parts[3]||'', phone:parts[4]||'', timeSlot:parts[5]||'', submittedAt:parts[6]||'' };
+      var dup = data.some(function(d){ return d.phone===rec.phone && d.name===rec.name; });
+      if (!dup && rec.name && rec.phone) { data.unshift(rec); count++; }
+    }
+  }
+  render();
+  document.getElementById('rawInput').value = '';
+  alert('导入 '+count+' 条新记录，共 '+data.length+' 条');
+}
+
+function exportCSV() {
+  if (!data.length) return alert('暂无数据');
+  var h='序号,姓名,性别,政治面貌,专业班级,电话,献血时间,提交时间\n';
+  data.forEach(function(d,i){ h+=[i+1,d.name,d.gender,d.political||'',d.classInfo,d.phone,d.timeSlot||'',d.submittedAt||''].map(function(v){return'"'+(v||'').replace(/"/g,'""')+'"';}).join(',')+'\n'; });
+  var b=new Blob(['﻿'+h],{type:'text/csv;charset=utf-8'});
+  var u=URL.createObjectURL(b); var a=document.createElement('a'); a.href=u; a.download='献血报名_'+new Date().toISOString().slice(0,10)+'.csv';
+  document.body.appendChild(a); a.click(); setTimeout(function(){document.body.removeChild(a);URL.revokeObjectURL(u);},200);
+}
+
+function esc(s){ var d=document.createElement('div'); d.textContent=s||''; return d.innerHTML; }
+render();
+</script>
+</body>
+</html>
