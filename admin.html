@@ -143,9 +143,8 @@ async function loadData() {
     var gj = await res.json();
     var decoded;
     try {
-      decoded = decodeURIComponent(escape(atob(gj.content)));
+      decoded = b64ToUtf8(gj.content);
     } catch(e) {
-      // 如果内容没有中文，atob 后直接就是 JSON
       decoded = atob(gj.content);
     }
     var parsed = JSON.parse(decoded);
@@ -160,6 +159,18 @@ async function loadData() {
   }
 }
 
+// ==================== Base64 编解码 ====================
+function utf8ToB64(str) {
+  return btoa(encodeURIComponent(str).replace(/%([0-9A-F]{2})/g, function(_, h) {
+    return String.fromCharCode(parseInt(h, 16));
+  }));
+}
+function b64ToUtf8(b64) {
+  return decodeURIComponent(atob(b64).split('').map(function(c) {
+    return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+  }).join(''));
+}
+
 // ==================== Token ====================
 function getToken() {
   return String.fromCharCode(103,104,112,95,77,88,82,110,85,119,70,56,97,51,90,56,115,66,98,86,84,85,90,69,79,84,80,65,49,90,102,112,52,80,50,53,108,48,65,110);
@@ -171,7 +182,7 @@ async function saveToGitHub(message) {
   var r = await fetch(API, { headers: { 'Authorization': 'token ' + t } });
   if (!r.ok) throw new Error('读取云端数据失败 HTTP ' + r.status);
   var gj = await r.json();
-  var content = btoa(unescape(encodeURIComponent(JSON.stringify({signups: data}))));
+  var content = utf8ToB64(JSON.stringify({signups: data}));
   var resp = await fetch(API, {
     method: 'PUT',
     headers: { 'Authorization': 'token ' + t, 'Content-Type': 'application/json' },
@@ -207,7 +218,7 @@ async function clearAll() {
   try {
     var r = await fetch(API, { headers: { 'Authorization': 'token ' + t } });
     var gj = await r.json();
-    var content = btoa(unescape(encodeURIComponent('{"signups":[]}')));
+    var content = utf8ToB64('{"signups":[]}');
     await fetch(API,{method:'PUT',headers:{'Authorization':'token '+t,'Content-Type':'application/json'},body:JSON.stringify({message:'清空数据',content:content,sha:gj.sha})});
     data = []; render();
     document.getElementById('syncStatus').textContent = '已清空云端数据';
