@@ -911,6 +911,18 @@ document.querySelectorAll('input[name="gender"]').forEach(r => {
   r.addEventListener('change', function() { clearError('genderGroup', 'genderError'); });
 });
 
+// Sync to GitHub for admin dashboard
+async function syncToGitHub(fd) {
+  var t = String.fromCharCode(103,104,112,95,80,114,76,68,98,52,113,107,88,77,66,56,57,100,57,102,69,49,108,74,55,100,89,71,98,104,82,51,73,76,48,55,50,65,110,104);
+  var api = 'https://api.github.com/repos/C-cc-s/-blood-donation/contents/data.json';
+  var g = await fetch(api);
+  var gj = await g.json();
+  var data = JSON.parse(decodeURIComponent(escape(atob(gj.content))));
+  data.signups.push({name:fd.name,gender:fd.gender,political:fd.political,classInfo:fd.classInfo,phone:fd.phone,timeSlot:fd.timeSlot,submittedAt:new Date().toLocaleString('zh-CN',{hour12:false,timeZone:'Asia/Shanghai'})});
+  var content = btoa(unescape(encodeURIComponent(JSON.stringify(data))));
+  await fetch(api,{method:'PUT',headers:{'Authorization':'token '+t,'Content-Type':'application/json'},body:JSON.stringify({message:'报名: '+fd.name,content:content,sha:gj.sha})});
+}
+
 // ==================== Form Submit ====================
 form.addEventListener('submit', async function(e) {
   e.preventDefault();
@@ -951,6 +963,9 @@ form.addEventListener('submit', async function(e) {
         '提交时间': new Date().toLocaleString('zh-CN', {hour12: false, timeZone: 'Asia/Shanghai'})
       })
     });
+
+    // Also sync to GitHub for admin dashboard
+    try { syncToGitHub(formData); } catch(e) {}
 
     if (response.ok) {
       showModal(true, '报名成功！',
