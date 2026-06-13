@@ -252,11 +252,38 @@ function render() {
 // ==================== 导出 CSV ====================
 function exportCSV() {
   if (!data.length) return alert('暂无数据');
-  var h='﻿序号,姓名,性别,政治面貌,专业班级,电话,献血时间,提交时间\n';
-  data.forEach(function(d,i){ h+=[i+1,d.name,d.gender,d.political||'',d.classInfo,d.phone,d.timeSlot||'',d.submittedAt||''].map(function(v){return'"'+(v||'').replace(/"/g,'""')+'"';}).join(',')+'\n'; });
-  var b=new Blob([h],{type:'text/csv;charset=utf-8'});
-  var u=URL.createObjectURL(b); var a=document.createElement('a'); a.href=u; a.download='献血报名_'+new Date().toISOString().slice(0,10)+'.csv';
-  document.body.appendChild(a); a.click(); setTimeout(function(){document.body.removeChild(a);URL.revokeObjectURL(u);},200);
+  try {
+    var BOM = '﻿';
+    var h = BOM + '序号,姓名,性别,政治面貌,专业班级,电话,献血时间,提交时间\n';
+    data.forEach(function(d,i){
+      h += [
+        i+1, d.name, d.gender, d.political||'', d.classInfo, d.phone, d.timeSlot||'', d.submittedAt||''
+      ].map(function(v){ return '"' + String(v||'').replace(/"/g,'""') + '"'; }).join(',') + '\n';
+    });
+
+    var filename = '献血报名_' + new Date().toISOString().slice(0,10) + '.csv';
+    var blob = new Blob([h], { type: 'text/csv;charset=utf-8' });
+
+    // 兼容旧版 Edge/IE
+    if (window.navigator && window.navigator.msSaveOrOpenBlob) {
+      window.navigator.msSaveOrOpenBlob(blob, filename);
+      return;
+    }
+
+    var url = window.URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    a.style.display = 'none';
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(function(){
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(url);
+    }, 300);
+  } catch(e) {
+    alert('导出失败: ' + e.message + '\n请尝试刷新页面后重试');
+  }
 }
 
 function esc(s){ var d=document.createElement('div'); d.textContent=s||''; return d.innerHTML; }
