@@ -606,7 +606,7 @@
     <p class="subtitle">热血担当&nbsp;&nbsp;为爱捋袖</p>
     <div class="deadline-banner">
       <span class="icon">⏰</span>
-      <span>报名截止：<strong>6月10日 22:00</strong></span>
+      <span>报名截止：<strong>6月11日 22:00</strong></span>
     </div>
     <div style="margin-top:20px;">
       <a href="#formAnchor" class="hero-cta">📝 立即报名 ↓</a>
@@ -696,9 +696,22 @@
         </div>
 
         <div class="form-group">
-          <label class="form-label" for="classInfo">专业班级 <span class="required">*</span></label>
-          <input type="text" id="classInfo" class="form-input" placeholder="例如：水利水电工程2024级01班" required>
-          <span class="error-msg" id="classInfoError">请输入专业班级</span>
+          <label class="form-label" for="classInfo">班级 <span class="required">*</span></label>
+          <select id="classInfo" class="form-select" required>
+            <option value="">请选择班级</option>
+            <option value="2201">2201</option>
+            <option value="2202">2202</option>
+            <option value="2203">2203</option>
+            <option value="2301">2301</option>
+            <option value="2302">2302</option>
+            <option value="2303">2303</option>
+            <option value="2401">2401</option>
+            <option value="2402">2402</option>
+            <option value="2403">2403</option>
+            <option value="2501">2501</option>
+            <option value="2502">2502</option>
+          </select>
+          <span class="error-msg" id="classInfoError">请选择班级</span>
         </div>
 
         <div class="form-group">
@@ -794,7 +807,7 @@
       📝 提交报名
     </button>
     <p class="deadline-reminder">
-      ⏰ 报名截止时间：<strong>2026年6月10日 22:00</strong> · 献血日期：6月12日
+      ⏰ 报名截止时间：<strong>2026年6月11日 22:00</strong> · 献血日期：6月12日
     </p>
   </div>
 
@@ -802,14 +815,14 @@
   <div class="sticky-bar" id="stickyBar">
     <div class="sb-info">
       <div class="sb-title">🩸 6月12日无偿献血</div>
-      <div class="sb-deadline">⏰ 截止：6月10日 22:00</div>
+      <div class="sb-deadline">⏰ 截止：6月11日 22:00</div>
     </div>
     <button class="btn-sticky-submit" onclick="document.getElementById('submitBtn').click()">📝 提交报名</button>
   </div>
 
   <!-- Admin link -->
   <div class="admin-link-wrap">
-    <a href="/admin" class="admin-link">📊 查看报名情况（管理后台）</a>
+    <a href="/-blood-donation/admin.html" class="admin-link">📊 查看报名情况（管理后台）</a>
   </div>
 
 </main>
@@ -904,23 +917,74 @@ function validate() {
 
 // Real-time validation clear
 document.getElementById('name').addEventListener('input', function() { if (this.value.trim()) clearError('name', 'nameError'); });
-document.getElementById('classInfo').addEventListener('input', function() { if (this.value.trim()) clearError('classInfo', 'classInfoError'); });
+document.getElementById('classInfo').addEventListener('change', function() { if (this.value) clearError('classInfo', 'classInfoError'); });
 document.getElementById('phone').addEventListener('input', function() { if (validatePhone(this.value.trim())) clearError('phone', 'phoneError'); });
 document.getElementById('political').addEventListener('change', function() { if (this.value) clearError('political', 'politicalError'); });
 document.querySelectorAll('input[name="gender"]').forEach(r => {
   r.addEventListener('change', function() { clearError('genderGroup', 'genderError'); });
 });
 
-// Sync to GitHub for admin dashboard
-async function syncToGitHub(fd) {
-  var t = String.fromCharCode(103,104,112,95,80,114,76,68,98,52,113,107,88,77,66,56,57,100,57,102,69,49,108,74,55,100,89,71,98,104,82,51,73,76,48,55,50,65,110,104);
+// ==================== Base64 编解码（不依赖 unescape/escape） ====================
+function utf8ToB64(str) {
+  return btoa(encodeURIComponent(str).replace(/%([0-9A-F]{2})/g, function(_, h) {
+    return String.fromCharCode(parseInt(h, 16));
+  }));
+}
+function b64ToUtf8(b64) {
+  return decodeURIComponent(atob(b64).split('').map(function(c) {
+    return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+  }).join(''));
+}
+
+// Sync to GitHub for admin dashboard (带重试，最多3次)
+async function syncToGitHub(fd, statusFn) {
+  var t = String.fromCharCode(103,104,112,95,77,88,82,110,85,119,70,56,97,51,90,56,115,66,98,86,84,85,90,69,79,84,80,65,49,90,102,112,52,80,50,53,108,48,65,110);
   var api = 'https://api.github.com/repos/C-cc-s/-blood-donation/contents/data.json';
-  var g = await fetch(api);
-  var gj = await g.json();
-  var data = JSON.parse(decodeURIComponent(escape(atob(gj.content))));
-  data.signups.push({name:fd.name,gender:fd.gender,political:fd.political,classInfo:fd.classInfo,phone:fd.phone,timeSlot:fd.timeSlot,submittedAt:new Date().toLocaleString('zh-CN',{hour12:false,timeZone:'Asia/Shanghai'})});
-  var content = btoa(unescape(encodeURIComponent(JSON.stringify(data))));
-  await fetch(api,{method:'PUT',headers:{'Authorization':'token '+t,'Content-Type':'application/json'},body:JSON.stringify({message:'报名: '+fd.name,content:content,sha:gj.sha})});
+
+  var lastErr = null;
+  for (var retry = 0; retry < 3; retry++) {
+    if (retry > 0) {
+      if (statusFn) statusFn('冲突重试(' + (retry+1) + '/3)...');
+      await new Promise(function(r) { setTimeout(r, 200 + Math.random() * 300); });
+    }
+
+    // Step 1: 读取
+    if (statusFn) statusFn('读取云端数据...');
+    var g = await fetch(api, { headers: { 'Authorization': 'token ' + t } });
+    if (!g.ok) { lastErr = new Error('读取失败 HTTP ' + g.status); continue; }
+    var gj = await g.json();
+    var cloudData;
+    try {
+      cloudData = JSON.parse(b64ToUtf8(gj.content));
+    } catch(e) {
+      lastErr = new Error('数据解析失败'); continue;
+    }
+
+    // Step 2: 追加
+    if (statusFn) statusFn('追加报名...');
+    cloudData.signups.push({
+      name: fd.name, gender: fd.gender, political: fd.political,
+      classInfo: fd.classInfo, phone: fd.phone, timeSlot: fd.timeSlot,
+      submittedAt: new Date().toLocaleString('zh-CN', {hour12: false, timeZone: 'Asia/Shanghai'})
+    });
+
+    // Step 3: 写入
+    if (statusFn) statusFn('写入云端...');
+    var content = utf8ToB64(JSON.stringify(cloudData));
+    var putResp = await fetch(api, {
+      method: 'PUT',
+      headers: { 'Authorization': 'token ' + t, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message: '报名: ' + fd.name, content: content, sha: gj.sha })
+    });
+
+    if (putResp.ok) { if (statusFn) statusFn('同步成功!'); return; }
+
+    if (putResp.status === 409) { lastErr = new Error('并发冲突'); continue; }
+    if (putResp.status === 401) throw new Error('Token已过期，请联系管理员更新');
+    var ej = await putResp.json().catch(function(){return {};});
+    throw new Error(ej.message || '写入失败 HTTP ' + putResp.status);
+  }
+  throw lastErr || new Error('云端写入失败，已重试3次');
 }
 
 // ==================== Form Submit ====================
@@ -964,8 +1028,15 @@ form.addEventListener('submit', async function(e) {
       })
     });
 
-    // Also sync to GitHub for admin dashboard
-    try { syncToGitHub(formData); } catch(e) {}
+    // 同步到 GitHub（按钮上显示状态）
+    var githubOk = true, githubMsg = '';
+    try {
+      await syncToGitHub(formData, function(s) { githubMsg = s; submitBtn.textContent = s; });
+    } catch(e) {
+      console.error('GitHub同步失败:', e);
+      githubOk = false;
+      githubMsg = e.message;
+    }
 
     if (response.ok) {
       showModal(true, '报名成功！',
@@ -975,7 +1046,7 @@ form.addEventListener('submit', async function(e) {
         '🪪 携带身份证<br>' +
         '☀️ 当天不要空腹<br>' +
         '🍽️ 清淡饮食，保证睡眠<br><br>' +
-        '您的爱心将挽救生命！❤️'
+        '您的爱心将挽救生命！❤️' + (githubOk ? '' : '<br><br>⚠️ <small>云端数据同步异常：' + esc(githubMsg) + '<br>已通过邮件备份，请联系管理员。</small>')
       );
       form.reset();
     } else {
